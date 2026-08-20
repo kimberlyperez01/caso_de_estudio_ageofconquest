@@ -1,0 +1,67 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Age of Conquest - Simulador</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-200 font-sans min-h-screen p-8">
+
+    <div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Panel de Control (Formulario) -->
+        <div class="col-span-1 bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+            <h2 class="text-2xl font-bold text-emerald-400 mb-6 border-b border-slate-600 pb-2">Panel de Control</h2>
+
+            <form method="POST" action="/">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Tesoro Inicial (Oro)</label>
+                    <input type="number" name="tesoro_inicial" value="{{ input_tesoro or 200 }}" 
+                           class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Tropas del Imperio</label>
+                    <input type="number" name="tropas_imperio" value="{{ input_tropas or 40 }}" 
+                           class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Tropas Rebeldes</label>
+                    <input type="number" name="tropas_rebeldes" value="{{ input_rebeldes or 25 }}" 
+                           class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                    Ejecutar Simulación
+                </button>
+            </form>
+        </div>
+
+        <!-- Pantalla de Resultados -->
+        <div class="col-span-1 lg:col-span-2 bg-black p-6 rounded-xl border border-slate-700 shadow-xl overflow-hidden flex flex-col h-[600px]">
+            <h2 class="text-2xl font-bold text-blue-400 mb-4 border-b border-slate-600 pb-2">Consola de Eventos (LEF)</h2>
+
+            <div class="overflow-y-auto flex-grow font-mono text-sm text-green-400 space-y-1 pr-2">
+                {% if logs %}
+                    {% for linea in logs %}
+                        <!-- Lógica visual básica: resaltar alertas -->
+                        {% if "ALERTA" in linea %}
+                            <p class="text-red-400 font-bold">{{ linea }}</p>
+                        {% elif "Turno" in linea %}
+                            <p class="text-blue-300 mt-4">{{ linea }}</p>
+                        {% else %}
+                            <p>{{ linea }}</p>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <p class="text-slate-500 italic">Esperando parámetros... Pulsa 'Ejecutar Simulación' para iniciar el motor.</p>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>
