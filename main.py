@@ -1,59 +1,58 @@
-# main.py
-# Script de entrada para el Simulador Age of Conquest
-
-from models import Territorio, Faccion
+from fastapi import FastAPI, Request, Form
+from fastapi.templating import Jinja2Templates
 from engine import MotorSimulacion
+from models import Faccion, Territorio
 
-def main():
-    print("==================================================")
-    print("   MOTOR LÓGICO DE SIMULACIÓN: AGE OF CONQUEST    ")
-    print("==================================================")
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/")
+def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "logs": None, "metricas": None})
+
+@app.post("/")
+def ejecutar_simulacion(
+    request: Request,
+    tesoro_inicial: float = Form(200.0),
+    tropas_imperio: int = Form(40),
+    tropas_rebeldes: int = Form(25)
+):
+    motor = MotorSimulacion()
     
-    # 1. Configuración de Estado Inicial (t = 0)
-    # Faccion: Nombre, Tesoro Inicial, Costo de Mantenimiento por unidad
-    imperio = Faccion(nombre="Imperio de Jade", tesoro_inicial=200.0, costo_mantenimiento_unitario=15.0)
+    # Configuración con los valores enviados desde tu formulario web
+    imperio = Faccion(nombre="Imperio de Jade", tesoro_inicial=tesoro_inicial, costo_mantenimiento_unitario=15.0)
+    imperio.ejercito = tropas_imperio
+    imperio.moral = 80.0
+    
+    motor.facciones.append(imperio)
+    
     rebeldes = Faccion(nombre="Rebeldes del Sur", tesoro_inicial=50.0, costo_mantenimiento_unitario=10.0)
+    rebeldes.ejercito = tropas_rebeldes
+    rebeldes.moral = 75.0
     
-    # Configuración de tropas: 40 unidades a 15 de costo = 600 de gasto militar por turno.
-    imperio.ejercito = 40 
-    rebeldes.ejercito = 25
-    
-    # Territorios: Nombre, Poblacion, Capacidad Carga (K), Tasa Impositiva (I)
     capital = Territorio(nombre="Capital Primus", poblacion_inicial=1000, capacidad_carga=5000, tasa_impositiva=0.4)
     provincia = Territorio(nombre="Frontera Norte", poblacion_inicial=300, capacidad_carga=800, tasa_impositiva=0.2)
-    
     imperio.agregar_territorio(capital)
     imperio.agregar_territorio(provincia)
     
-    print("\n--- Estado Inicial (t=0) ---")
-    print(f"Facción: {imperio.nombre}")
-    print(f"Tesoro: {imperio.tesoro} oro | Ejército Activo: {imperio.ejercito} tropas")
-    print(f"Gasto Militar Proyectado: {imperio.calcular_gasto_militar()} oro")
-    print("----------------------------")
-    
-    # 2. Inicialización del Motor Lógico
-    motor = MotorSimulacion()
-    
-    # 3. Carga de la Lista de Eventos Futuros (LEF) para el Turno 1
-    # Programamos primero el crecimiento poblacional y luego la economía,
-    # garantizando que los impuestos se cobren sobre la población ya actualizada.
+    # Programar eventos
     motor.programar_evento(tiempo=1, tipo="POBLACION", referencia=imperio)
     motor.programar_evento(tiempo=1, tipo="ECONOMIA", referencia=imperio)
-    
-    # Programamos el ataque para el Turno 2
-    # Nota que pasamos una tupla (atacante, defensor) como referencia
     motor.programar_evento(tiempo=2, tipo="ATAQUE", referencia=(imperio, rebeldes))
     
-    # 4. Bucle de Simulación (Ejecución de al menos 5 fases consecutivas)
-    print("\nIniciando secuencia de simulación discreta...")
+    # Ejecutamos usando el método que devuelve el diccionario con logs y métricas
+    resultado = motor.ejecutar_y_capturar_logs(fases=5)
     
-    # Ejecutamos eventos mientras el motor siga activo (reloj <= 5)
-    while motor.activo and motor.reloj <= 5:
-        motor.ejecutar_turno()
-        
-    print("\n==================================================")
-    print("        SIMULACIÓN FINALIZADA CON ÉXITO           ")
-    print("==================================================")
+    print("--- DEBUG FASTAPI ---")
+    print(f"Total Logs capturados: {len(resultado['logs'])}")
+    print(f"Total Métricas capturadas: {len(resultado['metricas'])}")
+    print("-----------------------")
 
-if __name__ == "__main__":
-    main()
+    return templates.TemplateResponse("index.html", {
+        "request": request, 
+        "logs": resultado["logs"],
+        "metricas": resultado["metricas"],
+        "input_tesoro": tesoro_inicial,
+        "input_tropas": tropas_imperio,
+        "input_rebeldes": tropas_rebeldes
+    })

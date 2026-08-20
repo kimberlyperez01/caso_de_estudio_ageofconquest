@@ -18,4 +18,4 @@ EXPOSE 8000
 
 # Comando para iniciar el servidor web cuando arranque el contenedor
 # Usamos 0.0.0.0 para que sea accesible desde fuera del contenedor
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

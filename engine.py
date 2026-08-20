@@ -10,12 +10,24 @@ class MotorSimulacion:
         self.facciones = []
         self.activo = True
         self.historial_logs = []  # <-- 1. Inicializamos la lista de captura
+        self.historial_metricas = []
 
     def log(self, mensaje: str):
         """2. Método centralizado para capturar texto para la web y la consola."""
         self.historial_logs.append(mensaje)
         print(mensaje) # Lo mantenemos en consola también para que puedas depurar
 
+    def registrar_metrica_turno(self, faccion):
+        """Guarda una 'foto' del estado de la facción al final del turno."""
+        poblacion_total = sum(t.poblacion for t in faccion.territorios)
+        self.historial_metricas.append({
+            "turno": self.reloj,
+            "faccion": faccion.nombre,
+            "tesoro": round(faccion.tesoro, 2),
+            "ejercito": faccion.ejercito,
+            "poblacion": round(poblacion_total, 2)
+        })
+    
     def programar_evento(self, tiempo, tipo, referencia):
         heapq.heappush(self.lef, (tiempo, tipo, referencia))
 
@@ -51,6 +63,8 @@ class MotorSimulacion:
                 faccion.tesoro = 0
                 self.log(f"¡ALERTA! Bancarrota. Han desertado {desercion} unidades.")
 
+            self.registrar_metrica_turno(faccion)
+
         elif tipo == "POBLACION":
             faccion = referencia
             self.log(f"\n--- Turno {self.reloj} | Ejecutando: POBLACION para {faccion.nombre} ---")
@@ -61,7 +75,6 @@ class MotorSimulacion:
         elif tipo == "ATAQUE":
             atacante, defensor = referencia
             self.log(f"\n--- Turno {self.reloj} | Ejecutando: ATAQUE de {atacante.nombre} a {defensor.nombre} ---")
-            
             simulador_batalla = ModeloCombate()
             
             # 3. Pasamos nuestro recolector de logs al modelo de combate
@@ -80,11 +93,23 @@ class MotorSimulacion:
             
             self.log(f"Estado Post-Combate -> {atacante.nombre}: {atacante.ejercito} tropas | {defensor.nombre}: {defensor.ejercito} tropas")
 
+        if self.facciones:
+            faccion_principal = self.facciones[0] # O tu facción evaluada
+        else:
+            # Si no guardaste facciones en una lista, buscamos la referencia si es Facción o tupla
+            if isinstance(referencia, tuple):
+                faccion_principal = referencia[0] # El atacante
+            else:
+                faccion_principal = referencia
+                
+        self.registrar_metrica_turno(faccion_principal)
+        
         # Programar los eventos cíclicos
         if tipo in ["ECONOMIA", "POBLACION"] and self.reloj < 5:
             self.programar_evento(self.reloj + 1, tipo, referencia)
 
-    def ejecutar_y_capturar_logs(self, fases: int) -> list:
+
+    def ejecutar_y_capturar_logs(self, fases: int) -> dict:
         """4. Método orquestador llamado desde FastAPI."""
         self.log("Iniciando secuencia de simulación discreta...")
         
@@ -97,4 +122,7 @@ class MotorSimulacion:
         self.log("==================================================")
         
         # Devolvemos toda la traza guardada a la web
-        return self.historial_logs
+        return {
+            "logs": self.historial_logs,
+            "metricas": self.historial_metricas
+        }

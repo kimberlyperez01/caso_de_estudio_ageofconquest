@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Age of Conquest - Simulador</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-200 font-sans min-h-screen p-8">
+
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Panel de Control (Formulario) -->
+        <div class="col-span-1 bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+            <h2 class="text-2xl font-bold text-emerald-400 mb-6 border-b border-slate-600 pb-2">Panel de Control</h2>
+            
+            <form method="POST" action="/">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Tesoro Inicial (Oro)</label>
+                    <input type="number" name="tesoro_inicial" value="{{ input_tesoro or 200 }}" 
+                           class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Tropas del Imperio</label>
+                    <input type="number" name="tropas_imperio" value="{{ input_tropas or 40 }}" 
+                           class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Tropas Rebeldes</label>
+                    <input type="number" name="tropas_rebeldes" value="{{ input_rebeldes or 25 }}" 
+                           class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                    Ejecutar Simulación
+                </button>
+            </form>
+        </div>
+
+        <!-- Pantalla de Resultados (Consola LEF) -->
+        <div class="col-span-1 lg:col-span-2 bg-black p-6 rounded-xl border border-slate-700 shadow-xl overflow-hidden flex flex-col h-[500px]">
+            <h2 class="text-2xl font-bold text-blue-400 mb-4 border-b border-slate-600 pb-2">Consola de Eventos (LEF)</h2>
+            <div class="overflow-y-auto flex-grow font-mono text-sm text-green-400 space-y-1 pr-2">
+                {% if logs %}
+                    {% for linea in logs %}
+                        {% if "ALERTA" in linea %}
+                            <p class="text-red-400 font-bold">{{ linea }}</p>
+                        {% elif "Turno" in linea %}
+                            <p class="text-blue-300 mt-4">{{ linea }}</p>
+                        {% elif "===" in linea or "---" in linea %}
+                            <p class="text-slate-400">{{ linea }}</p>
+                        {% else %}
+                            <p>{{ linea }}</p>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <p class="text-slate-500 italic">Esperando parámetros... Pulsa 'Ejecutar Simulación' para iniciar el motor.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Panel de Gráficas y Tablas (Solo aparece tras simular) -->
+        {% if metricas %}
+        <div class="col-span-1 lg:col-span-3 bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl mt-4">
+            <h2 class="text-2xl font-bold text-emerald-400 mb-6 border-b border-slate-600 pb-2">Evolución Sistémica (Macro-Estado por Turno)</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                <!-- Tabla Dinámica -->
+                <div class="overflow-x-auto bg-slate-900 rounded-lg border border-slate-700">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-950 text-slate-300 text-sm uppercase tracking-wider">
+                                <th class="p-4 border-b border-slate-700">Turno</th>
+                                <th class="p-4 border-b border-slate-700">Tesoro (Oro)</th>
+                                <th class="p-4 border-b border-slate-700">Ejército</th>
+                                <th class="p-4 border-b border-slate-700">Población Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm font-mono">
+                            {% for m in metricas %}
+                            <tr class="hover:bg-slate-800 transition-colors">
+                                <td class="p-4 border-b border-slate-800 font-bold text-blue-400">{{ m.turno }}</td>
+                                <td class="p-4 border-b border-slate-800 text-yellow-400">{{ m.tesoro }}</td>
+                                <td class="p-4 border-b border-slate-800 text-red-400">{{ m.ejercito }}</td>
+                                <td class="p-4 border-b border-slate-800 text-emerald-300">{{ m.poblacion }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Gráfica Chart.js -->
+                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 flex items-center justify-center">
+                    <canvas id="graficaEvolucion" class="w-full max-h-[300px]"></canvas>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Lógica de Chart.js inyectada de forma segura -->
+    {% if metricas %}
+    <script id="datos-metricas" type="application/json">
+        {{ metricas | tojson | safe }}
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const rawData = document.getElementById('datos-metricas').textContent;
+            const datosMetricas = JSON.parse(rawData);
+            
+            const turnos = datosMetricas.map(m => `T${m.turno}`);
+            const tesoros = datosMetricas.map(m => m.tesoro);
+            const ejercitos = datosMetricas.map(m => m.ejercito);
+
+            const ctx = document.getElementById('graficaEvolucion').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: turnos,
+                    datasets: [
+                        {
+                            label: 'Tesoro (Oro)',
+                            data: tesoros,
+                            borderColor: '#facc15',
+                            backgroundColor: 'rgba(250, 204, 21, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.3,
+                            borderWidth: 2,
+                            pointBackgroundColor: '#facc15'
+                        },
+                        {
+                            label: 'Ejército Activo',
+                            data: ejercitos,
+                            borderColor: '#f87171',
+                            backgroundColor: 'rgba(248, 113, 113, 0.1)',
+                            yAxisID: 'y1',
+                            tension: 0.3,
+                            borderWidth: 2,
+                            pointBackgroundColor: '#f87171'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1', font: { family: 'monospace' } } }
+                    },
+                    scales: {
+                        y: { 
+                            type: 'linear', 
+                            position: 'left', 
+                            title: { display: true, text: 'Oro', color: '#facc15' },
+                            ticks: { color: '#94a3b8' }, 
+                            grid: { color: '#334155' } 
+                        },
+                        y1: { 
+                            type: 'linear', 
+                            position: 'right', 
+                            title: { display: true, text: 'Tropas', color: '#f87171' },
+                            ticks: { color: '#94a3b8' }, 
+                            grid: { drawOnChartArea: false } 
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+    {% endif %}
+</body>
+</html>
